@@ -1,7 +1,6 @@
 import os
 import yaml
 
-
 class AppProperties:
     def __init__(self, filepath):
         self.filepath = filepath

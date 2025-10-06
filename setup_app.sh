@@ -18,7 +18,7 @@ SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 
 ##################################
 # --- Install Dependencies --- # 
-echo "Downloading dependencies"
+echo -e "\033[35mDownloading dependencies\033[35m"
 
 if ! command -v yq >/dev/null 2>&1; then
     echo "Installing yq"
@@ -26,17 +26,28 @@ if ! command -v yq >/dev/null 2>&1; then
 fi
 
 # pthon virtual envioronment
-sudo apt update && sudo apt install -y python3 python3-venv python3-pip
+echo -e "\033[35mUpdating package lists" 
+sudo apt update
+echo -e "\033[35mInstalling python enviorment" 
+sudo apt install -y python3 python3-venv python3-pip
 
 ##################################
 # --- Setting up python venv --- # 
-echo "Setting up python virtual enviornemnt"
+echo -e "\033[35mSetting up python virtual enviornemnt\033[35m"
 
+ENV_DIR="$SCRIPT_DIR"/.env
 #create venv folder
-mkdir "$SCRIPT_DIR"/.env
+if ! [[ -d "$ENV_DIR" ]]; then
+    mkdir "$SCRIPT_DIR"/.env
+else
+    echo -e "\033[35m.env folder already exists"
+fi
 
 #setup and install python virtual enviornment
 python3 -m meda_db "$SCRIPT_DIR"/.env
+
+source "$ENV_DIR"/
+
 
 #download python packages required
 
