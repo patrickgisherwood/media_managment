@@ -18,7 +18,7 @@ SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 
 ##################################
 # --- Install Dependencies --- # 
-echo -e "\033[35mDownloading dependencies\033[35m"
+echo -e "\033[35mDownloading dependencies!!\033[35m"
 
 if ! command -v yq >/dev/null 2>&1; then
     echo "Installing yq"
