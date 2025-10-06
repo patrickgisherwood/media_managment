@@ -1,0 +1,24 @@
+database:
+  host: localhost
+  port: 5432
+  user: patrick
+  password: mypassword
+  name: media_managment
+  directory: /mnt/piNas/Nasty/media_management-dev/
+  db_path: /mnt/piNas/Nasty/media_managment-dev.data/media.db
+  temp_path: ./.temp
+
+image_handling:
+  unsorted_images: ./unsorted
+  trash_directory: ./trash
+  delete_after_copy: false
+  archive: true
+  duplicate_detection:
+    prevent_duplicates: true
+    exclusion_directories:
+      - /mnt/piNas/Nasty/media_managment-dev/unsorted
+      - /mnt/piNas/Nasty/media_managment-dev/.archive
+
+features:
+  enable_logging: true
+  max_connections: 1

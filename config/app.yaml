@@ -1,0 +1,8 @@
+app:
+  name: Media Management
+  version: 1.0.0
+  venv_path: /.env
+  host: localhost
+  database:
+    name: None
+    path: None
