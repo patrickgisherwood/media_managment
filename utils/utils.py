@@ -1,8 +1,9 @@
 import os
+import ctypes
 import platform
-from datetime import datetime
 import logging
 from pathlib import Path
+from datetime import datetime
 
 # Sets up logger function
 def setup_logger(name, log_filename, log_path, level=logging.DEBUG):
@@ -102,7 +103,6 @@ class FileTools():
 
         if current_os == 'Windows':
             # Windows: Set file creation time
-            import ctypes
             FILETIME_OFFSET = 116444736000000000  # Windows FILETIME epoch adjustment
             hundred_ns = int(created_timestamp * 10000000) + FILETIME_OFFSET
             ctime = ctypes.c_ulonglong(hundred_ns)
@@ -116,7 +116,9 @@ class FileTools():
 
         elif current_os == 'Linux':
             # Linux: No native "creation time" modification, only modification/access times
-            print("Linux does not support direct file creation time modification.")
+
+            # Set modification and access times to the "created" timestamp
+            os.utime(filepath, (created_timestamp, created_timestamp))
 
         else:
             print(f"Unsupported OS: {current_os}")

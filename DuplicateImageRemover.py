@@ -135,7 +135,7 @@ class DuplicateImageRemover:
             duplicate = self.check_image(file_path)
             if duplicate:
                 duplicate_count += 1
-        print(Fore.MAGENTA + f"\nScan Complete."+Fore.CYAN+f"{duplicate_count} Duplicates detected\n")
+        print(Fore.MAGENTA + f"\nScan Complete."+Fore.CYAN+f"  {duplicate_count} Duplicates detected\n")
 
     def check_image(self, image_path):
         """

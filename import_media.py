@@ -1,17 +1,23 @@
 import os
 import sys
 from tqdm import tqdm
+from pathlib import Path
 from datetime import datetime
 from Image_Handler import ImgHandler
 from Video_Handler import VideoHandler
 from colorama import Fore, Style, init
 from utils.confighandler import AppProperties
 from utils.utils import setup_logger, FileTools
-#from utils.media_db import FileHashDB
 
 
 def main():
-    app_properties = AppProperties(r"C:\_Transfer\repos\home-lab\config\properties.yaml")
+
+    # Get database path from env variable 
+    DB_DIR = Path(os.environ["MEDIA_DB"])
+    CONFIG_DIR = DB_DIR / ".config/properties.yaml"
+
+    # load app properties
+    app_properties = AppProperties(CONFIG_DIR)
 
     import_directory = input(Fore.YELLOW+"Provide Directory to import media from: "+Fore.RESET).strip()
 
@@ -24,6 +30,7 @@ def main():
     exclusion_directories = app_properties.get("image_handling.duplicate_detection.exclusion_directories")      # exclusion directories
 
     # Setup debug logger
+    print(root_path)
     logger = setup_logger("history.log", "history.log", root_path)
     logger.info(f"\nStarting main.py")
     logger.info(f"Database root path: {root_path}")
