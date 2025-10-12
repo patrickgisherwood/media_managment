@@ -68,7 +68,7 @@ echo_msg -e "Downloading dependencies"
 
 # update pckages
 echo -e "Updating package lists" 
-sudo apt update
+sudo apt update > /dev/null
 
 if ! command -v yq >/dev/null 2>&1; then
     echo "Installing yq"
