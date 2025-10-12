@@ -13,6 +13,17 @@ else
   SCRIPT_PATH="$(cd "$(dirname "$SOURCE")" && pwd -P)/$(basename "$SOURCE")"
 fi
 
+
+echo_msg(){
+  MESSAGE=$1
+  echo -e "\033[35MESSAGE\033[35m"
+}
+
+echo_warning(){
+  MESSAGE=$1
+  echo -e "\033[35MESSAGE\033[35m"
+}
+
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 
 ##################################
@@ -33,7 +44,7 @@ done < <(grep -v '^#' "$config_file" | grep ':')
 SKIP_COPY=false
 if [ -f "$SCRIPT_DIR/config/app.yaml" ]; then
   if [[ -f "$app_config_path" ]]; then
-    echo -e "\033[35mWARNING - App config file alreay exists on device: $app_config_path \033[35m"
+    echo_warning -e "WARNING - App config file alreay exists on device: $app_config_path"
     input -e "\033[35mSkip coppying app.yaml which will overrite the current app settings?  [y/n]: \033[35m" CONTINUE
     if [[ "$CONTINUE" != 'y' ]];then
       exit 1   # need to handle this better.  How to exit this part of the code
@@ -47,45 +58,45 @@ if [ -f "$SCRIPT_DIR/config/app.yaml" ]; then
     cp "$SCRIPT_DIR/config/app.yaml" "$app_config_path"
   fi
 else
-  echo -e "WARNING - no default app.yaml file was found from the repo directory to copy the new database"
-  echo -e "location of missing file: $SCRIPT_DIR/config/app.yaml "
+  echo_warning -e "WARNING - no default app.yaml file was found from the repo directory to copy the new database"
+  echo_warning -e "location of missing file: $SCRIPT_DIR/config/app.yaml "
 fi
 
 ##################################
 # --- Install Dependencies --- # 
-echo -e "\033[35mDownloading dependencies!!\033[35m"
+echo_msg -e "Downloading dependencies"
+
+# update pckages
+echo -e "Updating package lists" 
+sudo apt update
 
 if ! command -v yq >/dev/null 2>&1; then
     echo "Installing yq"
     sudo apt-get install yq
 fi
 
-# pthon virtual envioronment
-echo -e "\033[35mUpdating package lists\033[35m" 
-sudo apt update
-echo -e "\033[35mInstalling python enviorment\033[35m" 
-sudo apt install -y python3 python3-venv python3-pip
 
 ##################################
 # --- Setting up python venv --- # 
-echo -e "\033[35mSetting up python virtual enviornemnt\033[35m"
+
+echo_msg "Setting up python virtual enviornemnt"
 
 ENV_DIR="$SCRIPT_DIR"/.env
 #create venv folder
 if ! [[ -d "$ENV_DIR" ]]; then
-    mkdir "$SCRIPT_DIR"/.envx
+    mkdir "$ENV_DIR"
 else
-    echo -e "\033[35m.env folder already exists"
+    echo_msg "$ENV_DIR folder already exists"
 fi
 
-python3 -m venv "$SCRIPT_DIR/.env/media_db"
+python3 -m venv "$ENV_DIR/media_db"
 source "$ENV_DIR"/media_db/bin/activate
 
-echo -e "\033[35mInstalling python enviornment dependencies\033[35m" 
+echo_msg "Installing python enviornment dependencies" 
 # download python packages
 python3 -m pip install --upgrade pillow-heif   # get rid of the "python3 -m"???
-pip install tqdm 
-pip install colorama
+python3 -m pip install tqdm 
+python3 -m pip install colorama
 python3 -m pip install piexif
 python3 -m pip install pyyaml
 python3 -m pip install numpy
@@ -93,7 +104,5 @@ python3 -m pip install imagehash
 python3 -m pip install tqdm
 
 
-
-
-echo -e "\033[35mMedia Managment setup complete\033[35m" 
+echo_msg "Media Managment setup complete" 
 
