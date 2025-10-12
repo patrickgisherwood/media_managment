@@ -13,18 +13,12 @@ else
   SCRIPT_PATH="$(cd "$(dirname "$SOURCE")" && pwd -P)/$(basename "$SOURCE")"
 fi
 
-
-echo_msg(){
-  MESSAGE=$1
-  echo -e "\033[35MESSAGE\033[35m"
-}
-
-echo_warning(){
-  MESSAGE=$1
-  echo -e "\033[35MESSAGE\033[35m"
-}
-
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+
+##################################
+# --- source functions --- # 
+source "$SCRIPT_DIR"/src/print_messages.sh
+
 
 ##################################
 # --- Get Configuration Info --- # 
