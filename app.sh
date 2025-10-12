@@ -40,7 +40,7 @@ help() {
 
     print_help_table "ARGUMENT" "DESCRIPTION" 
     print_help_table "get_config" "Prints app config"
-    #print_help_table "setup" "sets up new database on local device"
+    print_help_table "setup" "sets up new database on local device"
     print_help_table "import" "Imports media to database"
     print_help_table "help" "Prints this help menu"
     echo " "
@@ -67,7 +67,6 @@ load_app_settings(){
     APP_VERSION=$(yq '.app.version' "$APP_CONFIG")
     DB_NAME=$(yq '.app.database.name' "$APP_CONFIG")
     DB_HOST=$(yq '.app.database.host' "$APP_CONFIG")
-    DB_PORT=$(yq '.app.database.port' "$APP_CONFIG")
     DB_PATH=$(yq '.app.database.path' "$APP_CONFIG")
 
 
@@ -99,29 +98,41 @@ load_app_settings "$APP_CONFIG_PATH"
 ###############################
 # --- Source py container --- # 
 
-source "$SCRIPT_PATH"/env/python
+source_env(){
+  source "$SCRIPT_PATH"/.env/media_db/bin/activate
 
-if [[ $? -ne 0 ]];
-    echo -e "Error sourcing python environment"
-fi
+  if [[ $? -ne 0 ]];
+      echo -e "Error sourcing python environment"
+      echo -e "\033[31$?\033[0m"
+  fi
+
+}
+
 
 # Parse command line arguments
 while [[ "$#" -gt 0 ]]; do
   case $1 in
     import)
+        source_env
         python3 import.py
         shift
         ;;
-    create)
-        "$SCRIPT_DIR"/setup.sh
+    setup)
+        "$SCRIPT_DIR/setup.sh"
         python3 "$SCRIPT_DIR"/initilize_database.py
         shift
         ;;
+
+    source_env)
+        source_env
+        shift
+        ;;
+
     get_app_config)
         shift
 
         print_config "App Name" $APP_Name
-        print_config "App Versino" $APP_VERSION
+        print_config "App Version" $APP_VERSION
         print_config "App config path" $APP_CONFIG_PATH
         print_config "Database Name" $DB_NAME
         print_config "Database Path" $DB_PATH

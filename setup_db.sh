@@ -16,18 +16,6 @@ fi
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 
 
-
-##################################
-# --- Install Dependencies --- # 
-
-if ! command -v yq >/dev/null 2>&1; then
-    echo "Installing yq"
-    sudo apt-get install yq  # Ubuntu/Debian
-fi
-
-
-
-
 ##################################
 # --- Get Configuration Info --- # 
 
@@ -105,13 +93,7 @@ sudo chmod +x /etc/profile.d/media_db.sh
 #############################################
 #  --- Copy default configuration files --- #
 
-# app.yaml
-if [ -f "$SCRIPT_DIR/config/app.yaml" ]; then
-  cp "$SCRIPT_DIR/config/app.yaml" "$CONFIG_DIR"
-else
-  echo -e "WARNING - no default app.yaml file was found from the repo directory to copy the new database"
-  echo -e "location of missing file: $SCRIPT_DIR/config/app.yaml "
-fi
+
 
 # properties.yaml
 if [ -f "$SCRIPT_DIR"/config/properties.yaml ]; then
