@@ -20,9 +20,10 @@ SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 source "$SCRIPT_DIR"/src/print_messages.sh
 
 
+chmod +x setup_db.sh  
+
 ##################################
 # --- Get Configuration Info --- # 
-
 config_file="config/app.yaml"
 
 while IFS=":" read -r key value; do
@@ -38,7 +39,7 @@ done < <(grep -v '^#' "$config_file" | grep ':')
 SKIP_COPY=false
 if [ -f "$SCRIPT_DIR/config/app.yaml" ]; then
   if [[ -f "$app_config_path" ]]; then
-    echo_warning -e "WARNING - App config file alreay exists on device: $app_config_path"
+    echo_warning "WARNING - App config file alreay exists on device: $app_config_path"
     input -e "\033[35mSkip coppying app.yaml which will overrite the current app settings?  [y/n]: \033[35m" CONTINUE
     if [[ "$CONTINUE" != 'y' ]];then
       exit 1   # need to handle this better.  How to exit this part of the code
@@ -49,19 +50,19 @@ if [ -f "$SCRIPT_DIR/config/app.yaml" ]; then
   # only copy if user didn't skip
   if [[ "$SKIP_COPY" == false ]]; then
     echo "Copying app.yaml config file..."
-    cp "$SCRIPT_DIR/config/app.yaml" "$app_config_path"
+    sudo cp "$SCRIPT_DIR/config/app.yaml" "$app_config_path"
   fi
 else
-  echo_warning -e "WARNING - no default app.yaml file was found from the repo directory to copy the new database"
-  echo_warning -e "location of missing file: $SCRIPT_DIR/config/app.yaml "
+  echo_warning "WARNING - no default app.yaml file was found from the repo directory to copy the new database"
+  echo_warning "location of missing file: $SCRIPT_DIR/config/app.yaml "
 fi
 
 ##################################
 # --- Install Dependencies --- # 
-echo_msg -e "Downloading dependencies"
+echo_msg "Downloading dependencies"
 
 # update pckages
-echo -e "Updating package lists" 
+echo_msg "Updating package lists" 
 sudo apt update > /dev/null
 
 if ! command -v yq >/dev/null 2>&1; then

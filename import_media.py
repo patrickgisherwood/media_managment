@@ -122,7 +122,7 @@ def main():
     print(f"Starting transfer. \n")
     logger.info("Starting Transfer")
 
-    # 1️⃣ Collect all files to process
+    # Collect all files to process
     all_files = []
     for root, dirs, files in os.walk(import_directory):
         for file in files:
