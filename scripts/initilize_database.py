@@ -1,13 +1,28 @@
 import os
 import sys
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+SRC_DIR = ROOT_DIR / "src"
+for candidate in [
+    str(ROOT_DIR),
+    str(SRC_DIR),
+    str(SRC_DIR / "handlers"),
+    str(SRC_DIR / "core"),
+]:
+    if candidate not in sys.path:
+        sys.path.insert(0, candidate)
+
 from utils.utils import setup_logger
 from colorama import Fore, Style, init
-from Image_Handler import ImgHandler
+from handlers.Image_Handler import ImgHandler
 from utils.confighandler import AppProperties
 
 
 def main():
-    app_properties = AppProperties(r"C:\_Transfer\repos\home-lab\config\properties.yaml")
+
+    app_properties_path = os.path.join(os.getcwd(), "config/properties.yaml")
+    app_properties = AppProperties(app_properties_path)
 
     root_path = app_properties.get("database.directory")                        # root path of database
     archive_enabled = app_properties.get("image_handling.archive")              # archive enabled bool
@@ -68,7 +83,7 @@ def main():
         logger.info(f"Scanning images and updating database")
         image_handler.update_db(root_path)
 
-    os.makedirs(os.path.join(root_path, ".tmp"), exist_ok=True)       # Ensure tmp output directory exists (directory that ProcessImage.heic_to_jpg uses to temp save files to)
+    os.makedirs(app_properties.get("database.temp_path") or os.path.join(root_path, ".tmp"), exist_ok=True)
 
 
 main()

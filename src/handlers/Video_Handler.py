@@ -4,14 +4,18 @@ import shutil
 import exiftool
 from datetime import datetime
 from utils.utils import FileTools, get_exif_datetime
-from DuplicateImageRemover import DuplicateImageRemover
+from core.DuplicateImageRemover import DuplicateImageRemover
+
+
+def get_exiftool_executable():
+    return shutil.which("exiftool") or r"C:\Tools\ExifTool\exiftool.exe"
 
 
 class VideoHandler:
     def __init__(self, filepath, output_directory, logger, remove_files=False):
         self.filepath = filepath
         self.output_directory = output_directory
-        self.delete_orig_file = remove_files
+        self.delete_orig_file = bool(remove_files)
 
         self.filename = os.path.basename(filepath)
         self.extension = os.path.splitext(self.filename)[1]
@@ -87,11 +91,10 @@ class VideoHandler:
         ##with exiftool.ExifTool() as et:
         #    metadata = et.get_metadata(self.filepath)
 
-        with exiftool.ExifTool(executable=r"C:\Tools\ExifTool\exiftool.exe") as et:
-            
-            metadata = et.execute(b"-j", self.filepath.encode("utf-8"))          # -j gives JSON output
+        exiftool_path = get_exiftool_executable()
+        with exiftool.ExifTool(executable=exiftool_path) as et:
+            metadata = et.execute(b"-j", self.filepath.encode("utf-8"))
             metadata = json.loads(metadata)[0]
-            #metadata = json.loads(metadata.decode("utf-8"))[0]              # Decode and parse JSON
 
         # Example: Try to extract something like "DateTimeOriginal"
         possible_date_tags = [
@@ -139,33 +142,33 @@ class VideoHandler:
         # If dt is defined, datetime metadata exists for the image
         if dt:
             formatted_date = dt.strftime("%Y%m%d_%H%M%S")
-            folder_year = formatted_date[:4] 
+            folder_year = formatted_date[:4]
             self.output_directory = os.path.join(self.output_directory, folder_year)            # Modify output_directory to include year folder
             FileTools.ensure_folder_exists(self.output_directory)                                         # ensure the output directory exists
 
+            target_extension = self.extension if self.extension else ".mp4"
             if not self.filename.startswith(formatted_date[:8]):                                # Check if the filename already starts with the correct date string
-                base_filename = f"{formatted_date}.mov"                                         # get new base_filename based on date string
-                self.output_filepath = FileTools.get_unique_filename(os.path.join(self.output_directory, base_filename))           # ensure unique file path
-
+                base_filename = f"{formatted_date}{target_extension}"                           # get new base_filename based on date string
             else:                                                                               # filename already starts with correct date string
-                self.output_filepath = FileTools.get_unique_filename(os.path.join(self.output_directory, self.filename))           # ensure unique file path
+                base_filename = self.filename
+            self.output_filepath = FileTools.get_unique_filename(os.path.join(self.output_directory, base_filename))
+            return self.output_filepath
 
         # If datetime taken metadata doesn't exist
-        else:                                                                               # no date meta data for .jpg
-            self.output_directory = os.path.join(self.output_directory, "unsorted")
-            FileTools.ensure_folder_exists(self.output_directory)                                     # ensure the output directory exists
-            self.output_filepath = self.filepath.replace(self.extension, ".mov")            # keep original name and ensure .jpg file extnsion
-            self.output_filepath = FileTools.get_unique_filename(os.path.join(self.output_directory, self.filename))     # ensure unique name
+        self.output_directory = os.path.join(self.output_directory, "unsorted")
+        FileTools.ensure_folder_exists(self.output_directory)                                     # ensure the output directory exists
+        self.output_filepath = FileTools.get_unique_filename(os.path.join(self.output_directory, self.filename))     # ensure unique name
+        return self.output_filepath
 
     def save_video(self):
 
+        if not os.path.exists(self.filepath):
+            raise FileNotFoundError(f"Source video missing: {self.filepath}")
+
         file_size_orig = os.path.getsize(self.filepath)                     # get filesize of original file
-        if self.delete_orig_file == True:
-            shutil.move(self.filepath, self.output_filepath)                # execute the move
-        else:
-            shutil.copy2(self.filepath, self.output_filepath)               # execute the copy
-        file_size_new = os.path.getsize(self.output_filepath)                      # get filesize of the new file
-        
+        shutil.copy2(self.filepath, self.output_filepath)                   # copy original without deleting it
+        file_size_new = os.path.getsize(self.output_filepath)               # get filesize of the new file
+
         # confirm transfer by checking the filesize
         if file_size_new < file_size_orig:
             print(f'[ERROR] Errory copying file. Filesize of output is smaller then the orgiginal ')
@@ -173,28 +176,38 @@ class VideoHandler:
             print(f'[ERROR] New File: {self.output_filepath} : {file_size_new}')
             # logger entry
 
+        try:
+            exiftool_path = get_exiftool_executable()
+            with exiftool.ExifTool(executable=exiftool_path) as et:
+                et.execute("-overwrite_original", "-tagsFromFile", self.filepath, self.output_filepath)
+        except Exception as exc:
+            if self.logger is not None:
+                self.logger.info(f"Failed to preserve metadata on video copy: {exc}")
+
         # Set datetime
         if self.datetime_taken:
             dt = datetime.strptime(self.datetime_taken, "%Y:%m:%d %H:%M:%S")
             dt = int(dt.timestamp())                                        # Get datetime taken if it exists
             FileTools.set_file_creation_date(self.output_filepath, dt)                # Set file date created time
 
+        if self.delete_orig_file and os.path.exists(self.filepath):
+            os.remove(self.filepath)
+
     def save_json(self):
-        new_jpg_name = os.path.basename(self.output_filepath)
-        new_json_name = new_jpg_name.replace(".mov", ".json")
-        
+        new_video_name = os.path.basename(self.output_filepath)
+        new_json_name = os.path.splitext(new_video_name)[0] + ".json"
+
         new_json_path = os.path.join(self.output_directory, "_json", new_json_name)
-        
+
         if self.json_exists == True:
             FileTools.ensure_folder_exists(os.path.join(self.output_directory, "_json"))    # Ensure json output dir exists
             shutil.copy(self.json_path, new_json_path)                                      # Save the json
 
             if os.path.exists(new_json_path):                                               # confirm the file saved file actually exists
-                file_size = os.path.getsize(new_json_path)                                  # confirm the saved file has a filsize 
-                if file_size > 2:
-                    if self.delete_orig_file:                                 # check that file size is > 1 bytes
-                        os.remove(self.json_path)                                               # Delete the original file if the copy was succesfull 
-                else:
+                file_size = os.path.getsize(new_json_path)                                  # confirm the saved file has a filsize
+                if file_size > 2 and self.delete_orig_file:
+                    os.remove(self.json_path)
+                elif file_size <= 2:
                     self.json_saved = False
                     self.logger.info(f"Failed to confirm json saved. Filesize less then 2 bytes: {new_json_path}")
 

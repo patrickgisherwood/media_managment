@@ -5,7 +5,7 @@ from PIL import Image
 from datetime import datetime
 
 parent_directory = r"Z:\Vault\Pictures\All Photos\2013"
-output_directory = r"Z:\Vault\Pictures\All Photos\2013\pic-managment-out"
+output_directory = r"Z:\Vault\Pictures\All Photos\2013\pic-management-out"
 
 def apply_metadata_to_image(image_path, metadata, save_directory, json_path):
     # Get date and time for renaming from metadata

@@ -10,7 +10,7 @@ from PIL.ExifTags import TAGS
 from datetime import datetime
 import pillow_heif
 from pillow_heif import register_heif_opener
-from DuplicateImageRemover import DuplicateImageRemover
+from core.DuplicateImageRemover import DuplicateImageRemover
 from utils.confighandler import AppProperties
 
 
@@ -27,7 +27,14 @@ class ImgHandler:
 
         self.output_dir_root = self.app_properties.get("database.directory")
         self.delete_orig_file = self.app_properties.get("image_handling.delete_after_copy")
-        self.temp_path = self.app_properties.get("database.temp_path")
+        configured_temp_path = self.app_properties.get("database.temp_path")
+        if configured_temp_path:
+            self.temp_path = configured_temp_path
+            if os.path.basename(os.path.normpath(configured_temp_path)) == "tmp":
+                self.temp_path = os.path.join(self.output_dir_root, ".tmp")
+        else:
+            self.temp_path = os.path.join(self.output_dir_root, ".tmp")
+        FileTools.ensure_folder_exists(self.temp_path)
 
         # initilize objects
         self.logger = logger
@@ -139,8 +146,9 @@ class ImgHandler:
         pillow_heif.register_heif_opener()
 
         try:
+            FileTools.ensure_folder_exists(self.temp_path)
             with Image.open(self.filepath) as image:                            # Open the .HEIC file
-                jpg_path = os.path.join(self.file_output_dir, ".tmp", self.filename.replace(self.extension, ".jpg"))    # create tmp filepath
+                jpg_path = os.path.join(self.temp_path, self.filename.replace(self.extension, ".jpg"))    # create tmp filepath
                 jpg_path = FileTools.get_unique_filename(jpg_path)                                                     # ensure this is a unique filename
                 image.save(jpg_path, "jpeg")                                                                            # Save the new .jpg file
                 self.filepath_orig = self.filepath                                                                      # save original filepath for deletion of og image
@@ -156,6 +164,7 @@ class ImgHandler:
             self.logger.info(traceback.format_exc())  # Prints the full traceback
 
             self.logger.info(f"Error converting {self.filepath} to JPEG: {e}")
+            raise
 
     def extract_jpg_metadata(self):
         """
@@ -367,7 +376,7 @@ class ImgHandler:
             if self.tmp_file_exists == True:
                 file_size = os.path.getsize(output_filepath)           # confirm the saved file has a filsize 
                 if file_size > 250:                                         # check that file size is > 250 bytes
-                    tmp_filename = os.path.join(self.output_dir_root, ".tmp", self.filename.replace(self.extension, ".jpg"))
+                    tmp_filename = os.path.join(self.temp_path, self.filename.replace(self.extension, ".jpg"))
                     os.remove(tmp_filename)                                 # Delete the tmp file
                     self.tmp_file_exists = False                            # reset the flag
                 else:
@@ -381,7 +390,7 @@ class ImgHandler:
 
     def save_json(self, output_filepath):   
         new_jpg_name = os.path.basename(output_filepath)
-        new_json_name = new_jpg_name.replace(".jpg", ".json")
+        new_json_name = os.path.splitext(new_jpg_name)[0] + ".json"
 
         new_json_path = os.path.join(self.file_output_dir, "_json", new_json_name)
         
@@ -390,10 +399,10 @@ class ImgHandler:
             shutil.copy(self.json_path, new_json_path)                                  # copy the json
 
             if os.path.exists(new_json_path):                                           # confirm the file saved file actually exists
-                file_size = os.path.getsize(new_json_path)                              # confirm the saved file has a filsize 
-                if file_size > 2:                                                       # check that file size is > 1 bytes
-                    if self.delete_orig_file: 
-                        os.remove(self.json_path)                                       # Delete the original file if the copy was succesfull 
+                file_size = os.path.getsize(new_json_path)                              # confirm the saved file has a filsize
+                if file_size > 2:
+                    if self.delete_orig_file:
+                        os.remove(self.json_path)
                 else:
                     self.json_saved = False
                     self.logger.info(f"Failed to confirm json saved. Filesize less then 2 bytes: {new_json_path}")

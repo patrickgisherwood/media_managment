@@ -1,8 +1,8 @@
 app:
   name: Media Management
-  version: 1.0.0
-  app_config_path: /usr/local/etc/app.conf
-  venv_path: /.env
+  version: 1.1.0
+  app_install_path: /etc/media_management
+  venv_path: /etc/media_management/.venv
   host: localhost
   database:
     name: None

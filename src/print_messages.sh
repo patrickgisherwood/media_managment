@@ -1,8 +1,8 @@
-
+#!/bin/bash
 
 echo_msg(){
   MESSAGE=$1
-  echo -e "\033[35m$MESSAGE\033[35m"
+  echo -e "\033[35m$MESSAGE\033[0m"
 }
 
 echo_warning(){

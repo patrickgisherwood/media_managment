@@ -1,0 +1,11 @@
+
+
+
+
+Ran into this issue.  I think I need the python code to look in /usr/local/etc/media_management/app.yaml to know where to find the app instillation.  I need to add instillation folder (of the code) to that config.
+
+(.venv) :rack-admin@:/media_management/database_dev-20251105# /etc/media_management/app.sh import
+/etc/media_management/app.sh: line 103: /etc/media_management/app.sh/.venv/media_db/bin/activate: Not a directory
+Error sourcing python environment
+
+python3: can't open file '/home/patrick/media_management/database_dev-20251105/import.py': [Errno 2] No such file or directory

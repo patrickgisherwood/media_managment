@@ -1,10 +1,22 @@
 import os
 import sys
-from tqdm import tqdm
 from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+SRC_DIR = ROOT_DIR / "src"
+for candidate in [
+    str(ROOT_DIR),
+    str(SRC_DIR),
+    str(SRC_DIR / "handlers"),
+    str(SRC_DIR / "core"),
+]:
+    if candidate not in sys.path:
+        sys.path.insert(0, candidate)
+
+from tqdm import tqdm
 from datetime import datetime
-from Image_Handler import ImgHandler
-from Video_Handler import VideoHandler
+from handlers.Image_Handler import ImgHandler
+from handlers.Video_Handler import VideoHandler
 from colorama import Fore, Style, init
 from utils.confighandler import AppProperties
 from utils.utils import setup_logger, FileTools
@@ -13,11 +25,33 @@ from utils.utils import setup_logger, FileTools
 def main():
 
     # Get database path from env variable 
-    DB_DIR = Path(os.environ["MEDIA_DB"])
+    DB_DIR = Path(os.environ["MEDIA_DB"]).resolve()
     CONFIG_DIR = DB_DIR / ".config/properties.yaml"
 
     # load app properties
-    app_properties = AppProperties(CONFIG_DIR)
+    app_properties = AppProperties(str(CONFIG_DIR))
+
+    # Keep the database config aligned with the selected MEDIA_DB root. Some older
+    # database configs were created from a stale repo-local template and may contain
+    # the wrong absolute path.
+    resolved_db = str(DB_DIR)
+    current_db_dir = app_properties.get("database.directory")
+    temp_path = str(DB_DIR / ".tmp")
+    if current_db_dir not in (None, "", resolved_db):
+        app_properties.set("database.directory", resolved_db)
+        app_properties.set("database.db_path", str(DB_DIR / "media.db"))
+        app_properties.set("database.temp_path", temp_path)
+        app_properties.set("image_handling.unsorted_images", str(DB_DIR / "unsorted"))
+        app_properties.set("image_handling.trash_directory", str(DB_DIR / ".archive"))
+        app_properties.set(
+            "image_handling.duplicate_detection.exclusion_directories",
+            [str(DB_DIR / "unsorted"), str(DB_DIR / ".archive")],
+        )
+        app_properties.save()
+
+    if app_properties.get("database.temp_path") != temp_path:
+        app_properties.set("database.temp_path", temp_path)
+        app_properties.save()
 
     import_directory = input(Fore.YELLOW+"Provide Directory to import media from: "+Fore.RESET).strip()
 
@@ -64,44 +98,19 @@ def main():
 
     print(Fore.RESET + "\nContinue with the following settings?\n")
 
+    print_setting("Database Root", "DATABASE SELECTED - Path to the root database directory to write files to", root_path)
+    print_setting("Archive directory", "Directory where archives are stored when a duplicate is detected", archive_directory)
+    print_setting("Exclusion directories", "Directories to exclude from duplicate checking", exclusion_directories)
     print_setting("Delete after copy", "WARNING: Permanently deletes originals from import directory", delete_after_copy)
     print_setting("Enable Duplicate Detection", "Enables or disable duplicate checking when a file is imported", prevent_duplicates)
     print_setting("Archive enabled", "Archives duplicates to this folder", archive_enabled)
-    print_setting("Database Root", "Path to the root database folder to import media files to", root_path)
-    print_setting("Archive directory", "Directory where archives are stored when a duplicate is detected", archive_directory)
-    print_setting("Exclusion directories", "Directories to exclude from duplicate checking", exclusion_directories)
-
-    # confirm settings
-    user_accepted = input (Fore.YELLOW + f"\n[yes/no]:  "+Fore.RESET)
-
-    if user_accepted not in ("yes", "y", "YES"):
-        print(Fore.RED + "Exiting")
-        sys.exit(1)
-
-    # Re-scan images user input
-    for i in range(2):
-        run_scan = input(Fore.YELLOW+"\nExecute hash scan on all images currently contained in the database?"+Fore.RESET +" [yes/no]:  ").strip().lower()
-        if run_scan in "yes":
-            scan_images = True
-            break
-        elif run_scan == "no":
-            scan_images = False
-            break
-        else:
-            print("Invalid input. Please type 'yes' or 'no'.")
-    else:
-        print("Too many invalid attempts. Exiting.")
-        exit()        
 
     # Setup image handler based on app properties
     image_handler = ImgHandler(logger, app_properties.filepath)
     image_handler.prevent_duplicates(prevent_duplicates, exclusion_directories)
     image_handler.archive_path(archive_directory, archive_enabled)
-    if scan_images:
-        logger.info(f"Scanning images and updating database")
-        image_handler.update_db(root_path)
 
-    os.makedirs(os.path.join(root_path, "tmp"), exist_ok=True)       # Ensure tmp output directory exists (directory that ProcessImage.heic_to_jpg uses to temp save files to)
+    os.makedirs(app_properties.get("database.temp_path") or os.path.join(root_path, ".tmp"), exist_ok=True)
     max_copy_attempts = 10
 
     
@@ -147,7 +156,7 @@ def main():
         elif file.endswith(video_extensions):                                   # video processing
             for attempt in range(1, max_copy_attempts):
                 try:
-                    video = VideoHandler(file_path, root_path, logger, remove_files=False)
+                    video = VideoHandler(file, root_path, logger, remove_files=delete_after_copy)
                     video.run()
                     number_videos_processed += 1
                     break  # success
