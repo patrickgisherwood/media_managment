@@ -187,6 +187,6 @@ class FileTools():
         count = 0
         for root, _, files in os.walk(directory):
             for file in files:
-                if file.endswith(extensions) :
+                if file.lower().endswith(tuple(extension.lower() for extension in extensions)):
                     count += 1
         return count

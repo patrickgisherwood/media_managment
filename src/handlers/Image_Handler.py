@@ -5,7 +5,7 @@ import piexif
 import traceback        # only for debugging of traceback.  Possibly remove?
 from utils.utils import FileTools, get_exif_datetime
 from utils.confighandler import AppProperties
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from PIL.ExifTags import TAGS
 from datetime import datetime
 import pillow_heif
@@ -45,6 +45,29 @@ class ImgHandler:
         # ensure unsorted filepath exists
         FileTools.ensure_folder_exists(os.path.join(self.output_dir_root, "unsorted"))          # ensure the output directory exists
 
+    def _open_image(self, filepath):
+        if not os.path.isfile(filepath):
+            raise FileNotFoundError(f"Image is no longer present: {filepath}")
+
+        file_size = os.path.getsize(filepath)
+        if file_size == 0:
+            raise UnidentifiedImageError(f"Image is empty (0 bytes): {filepath}")
+
+        try:
+            with open(filepath, "rb") as image_file:
+                magic = image_file.read(16)
+        except OSError as error:
+            raise OSError(f"Image is not readable: {filepath} ({error})") from error
+
+        try:
+            image = Image.open(filepath)
+            image.load()
+            return image
+        except UnidentifiedImageError as error:
+            raise UnidentifiedImageError(
+                f"Image format could not be read ({file_size} bytes, signature {magic.hex()}): {filepath}"
+            ) from error
+
     def process_img(self, filepath):
         """
         Currently, due to handling of HEIC images, the json needs to be loaded prior to the heic
@@ -59,14 +82,14 @@ class ImgHandler:
         self.load_image_json()                              # Load .json data if it exists
 
         # If heic, convert it to a jpg for processing
-        if self.extension.endswith((".heic", "HEIC")):
+        if self.extension.lower() == ".heic":
             
             exif_data = self.extract_heic_metadata()                    # extract .heic metadata
             self.heic_to_jpg()                              # convert image to jpg
             self.loaded_img = Image.open(self.filepath)     # load the new jpg image
 
         else:  
-            self.loaded_img = Image.open(self.filepath)     # load the image
+            self.loaded_img = self._open_image(self.filepath)
             exif_data = self.extract_jpg_metadata()         # Extract metadata
             self.filepath_orig = self.filepath              # stupid variable needed because of self.heic_to_jpg saves a temp file and needs to update self.filepath
 
@@ -307,14 +330,16 @@ class ImgHandler:
             if not self.filename.startswith(formatted_date[:8]):                                # Check if the filename already starts with the correct date string
                 base_filename = f"{formatted_date}.jpg"                                         # get new base_filename based on date string
             else:                                                                               # filename already starts with correct date string
-                base_filename = self.filename
+                base_name, _ = os.path.splitext(self.filename)
+                base_filename = f"{base_name}.jpg"
             output_filepath = FileTools.get_unique_filename(os.path.join(self.file_output_dir, base_filename))    # ensure unique file path
 
         # If datetime taken metadata doesn't exist, save to "unsorted" folder
         else:                                                                           # no date meta data for .jpg
             self.file_output_dir = os.path.join(self.output_dir_root, "unsorted")
-            output_filepath = self.filepath.replace(self.extension, ".jpg")             # keep original name and ensure .jpg file extnsion
-            output_filepath = FileTools.get_unique_filename(os.path.join(self.file_output_dir, self.filename))     # ensure unique name
+            base_name, _ = os.path.splitext(self.filename)
+            jpg_filename = f"{base_name}.jpg"
+            output_filepath = FileTools.get_unique_filename(os.path.join(self.file_output_dir, jpg_filename))
             self.logger.info(f"Saving to unsorted path: {output_filepath}")
 
         return output_filepath
@@ -336,12 +361,19 @@ class ImgHandler:
             self.logger.info(f"error porcessing duplcate detection for output filepath {output_filepath}: {e}")
             self.logger.info(f"Original IMG path that caused error: {self.filepath}")
 
-        # Save the image 
-        if self.json_exists is True:                                # if json exists, apply metadata as new image is saved
-            exif_bytes = piexif.dump(exif_data)                     # Convert exif data into byte stream so it can be embeded into image
+        # All processed images are written as JPEG, so normalize Pillow modes that JPEG does not support.
+        if self.loaded_img.mode not in ("RGB", "L"):
+            self.loaded_img = self.loaded_img.convert("RGB")
+        elif self.loaded_img.mode == "L":
+            self.loaded_img = self.loaded_img.convert("RGB")
+
+        # Save the image
+        if self.json_exists is True:
+            exif_data = exif_data or {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}, "thumbnail": None}
+            exif_bytes = piexif.dump(exif_data)
             self.loaded_img.save(output_filepath, "jpeg", exif=exif_bytes)
             self.loaded_img.close()
-        else:                                                       # if no metadata, save without
+        else:
             self.loaded_img.save(output_filepath, "jpeg")
             self.loaded_img.close()
 

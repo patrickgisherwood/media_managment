@@ -86,6 +86,23 @@ the number and size of images and the Raspberry Pi's CPU and storage. Its
 progress display shows elapsed time, with additional elapsed-time updates
 written every minute to `database_scan.log` in the active database directory.
 
+### Multiple databases and targeted queries
+
+Each database keeps its own settings and SQLite file. Database setup registers the
+new database in `/etc/media_management/databases.json`.
+
+```bash
+media databases                         # list registered databases
+media current                           # print the active database
+media use family-photos                 # select a database in the current shell
+media --database family-photos import   # override the database for one command
+media query family-photos "SELECT * FROM file_hashes LIMIT 10"
+```
+
+Queries are read-only and accept exactly one SQL statement beginning with `SELECT`,
+`PRAGMA`, or `EXPLAIN`. Destructive import, scan, and configuration commands display
+the target database and require confirmation.
+
 ### Command line usage
 
 ```bash

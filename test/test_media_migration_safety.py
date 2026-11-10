@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = ROOT / "src"
@@ -109,6 +109,48 @@ def test_image_original_is_not_deleted_by_default(tmp_path):
 
     assert source.exists()
     assert target.exists()
+
+
+def test_unreadable_jpeg_reports_file_size_and_signature(tmp_path):
+    source = tmp_path / "IMG_1696.JPG"
+    source.write_bytes(b"not an image")
+
+    handler = object.__new__(__import__("Image_Handler").ImgHandler)
+    try:
+        handler._open_image(str(source))
+    except UnidentifiedImageError as error:
+        message = str(error)
+    else:
+        raise AssertionError("Invalid JPEG was unexpectedly accepted")
+
+    assert "12 bytes" in message
+    assert "signature 6e6f7420616e20696d616765" in message
+
+
+def test_transparent_png_is_converted_to_jpeg_rgb(tmp_path):
+    source = tmp_path / "photo.PNG"
+    image = Image.new("RGBA", (10, 10), (255, 0, 0, 128))
+    image.save(source)
+
+    handler = object.__new__(__import__("Image_Handler").ImgHandler)
+    handler.filepath = str(source)
+    handler.filepath_orig = str(source)
+    handler.output_dir_root = str(tmp_path)
+    handler.file_output_dir = str(tmp_path)
+    handler.delete_orig_file = False
+    handler.logger = None
+    handler.json_exists = False
+    handler.loaded_img = image
+    handler.tmp_file_exists = False
+    handler._prevent_duplicates_enabled = False
+    handler.datetime_taken = None
+
+    target = tmp_path / "exported.jpg"
+    handler.save_image(None, str(target))
+
+    with Image.open(target) as exported:
+        assert exported.mode == "RGB"
+        assert exported.format == "JPEG"
 
 
 def test_image_original_can_be_deleted_when_explicitly_opted_in(tmp_path):

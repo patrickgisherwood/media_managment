@@ -28,6 +28,14 @@ if [[ ! -f "$APP_CONFIG_PATH" && -f "$SCRIPT_DIR/config/app.yaml" ]]; then
 fi
 
 media() {
+  if [[ "${1:-}" == "use" ]]; then
+      if [[ $# -ne 2 ]]; then
+          echo "Usage: media use NAME" >&2
+          return 1
+      fi
+      eval "$("$APP_SCRIPT_PATH" use "$2")"
+      return
+  fi
   "$APP_SCRIPT_PATH" "$@"
 }
 
@@ -67,7 +75,12 @@ help() {
     echo -e "Media Management help menu: \n"
     print_help_table "ARGUMENT" "DESCRIPTION"
     print_help_table "setup" "Installs runtime config, Python environment, and creates a database if requested"
-    print_help_table "setup_db" "Sets up the application database"
+    print_help_table "setup_db" "Sets up a new application database"
+    print_help_table "databases, --databases" "Lists registered databases"
+    print_help_table "current [NAME], --current" "Shows the selected database"
+    print_help_table "use NAME" "Selects a database for future commands in this shell"
+    print_help_table "query NAME \"SQL\"" "Runs one read-only query"
+    print_help_table "--database NAME" "Overrides the database for one command"
     print_help_table "config" "Edits database settings for the active MEDIA_DB"
     print_help_table "get_config" "Prints app config"
     print_help_table "import" "Imports media to the active database"
@@ -139,6 +152,47 @@ source_env(){
 }
 
 
+# Extract the optional global database selector from either side of the command.
+DATABASE_OVERRIDE=""
+PARSED_ARGS=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --database)
+            if [[ $# -lt 2 ]]; then
+                echo -e "${RED}--database requires a database name or path.${RESET}" >&2
+                exit 1
+            fi
+            DATABASE_OVERRIDE="$2"
+            shift 2
+            ;;
+        --database=*)
+            DATABASE_OVERRIDE="${1#*=}"
+            shift
+            ;;
+        --databases|--database-list)
+            PARSED_ARGS+=("databases")
+            shift
+            ;;
+        --current)
+            PARSED_ARGS+=("current")
+            shift
+            ;;
+        *)
+            PARSED_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+set -- "${PARSED_ARGS[@]}"
+
+if [[ -n "$DATABASE_OVERRIDE" ]]; then
+    MEDIA_DB="$(${PYTHON:-python3} "$SCRIPT_DIR/scripts/database.py" resolve "$DATABASE_OVERRIDE")" || exit 1
+    export MEDIA_DB
+elif [[ -n "${MEDIA_DB:-}" ]]; then
+    RESOLVED_MEDIA_DB="$(${PYTHON:-python3} "$SCRIPT_DIR/scripts/database.py" resolve "$MEDIA_DB")" || exit 1
+    export MEDIA_DB="$RESOLVED_MEDIA_DB"
+fi
+
 # If no arguments were passed
 if [[ $# -eq 0 ]]; then
   echo "No argument passed.  Printing help menu"
@@ -149,8 +203,47 @@ fi
 # Parse command line arguments
 while [[ "$#" -gt 0 ]]; do
   case $1 in
+    databases|database)
+        source_env || exit 1
+        shift
+        if [[ $# -eq 0 ]]; then
+            python3 "$SCRIPT_DIR/scripts/database.py" list
+        else
+            python3 "$SCRIPT_DIR/scripts/database.py" "$@"
+        fi
+        exit $?
+        ;;
+    use)
+        shift
+        python3 "$SCRIPT_DIR/scripts/database.py" use "${1:?A database name or path is required}"
+        exit $?;
+        ;;
+    current)
+        shift
+        python3 "$SCRIPT_DIR/scripts/database.py" current --database "${1:-${MEDIA_DB:-}}"
+        exit $?;
+        ;;
+    query)
+        shift
+        if [[ $# -lt 2 ]]; then
+            echo -e "${RED}Usage: media query DATABASE \"SELECT ...\"${RESET}" >&2
+            exit 1
+        fi
+        python3 "$SCRIPT_DIR/scripts/database.py" query "$@"
+        exit $?;
+        ;;
     import)
-        source_env
+    if [[ -z "${MEDIA_DB:-}" ]]; then
+        echo -e "${RED}No database is selected. Run 'media databases', then 'media use NAME'.${RESET}" >&2
+        exit 1
+    fi
+    echo -e "${CYAN}Target database:${RESET} $MEDIA_DB"
+    read -r -p "Confirm import into this database? [y/N]: " CONFIRM_IMPORT
+    if [[ ! "$CONFIRM_IMPORT" =~ ^[Yy]$ ]]; then
+        echo "Import cancelled."
+        exit 0
+    fi
+    source_env
         python3 "$SCRIPT_DIR/scripts/import_media.py"
         shift
         ;;
@@ -158,6 +251,12 @@ while [[ "$#" -gt 0 ]]; do
         if [[ -z "${MEDIA_DB:-}" ]]; then
             echo -e "${RED}MEDIA_DB is not set. Source /etc/profile.d/media_db.sh or export MEDIA_DB first.${RESET}" >&2
             exit 1
+        fi
+        echo -e "${CYAN}Target database:${RESET} $MEDIA_DB"
+        read -r -p "Confirm this is the database to scan? [y/N]: " CONFIRM_SCAN
+        if [[ ! "$CONFIRM_SCAN" =~ ^[Yy]$ ]]; then
+            echo "Database scan cancelled."
+            exit 0
         fi
         source_env || exit 1
         python3 "$SCRIPT_DIR/scripts/scan_database.py"
@@ -203,6 +302,12 @@ while [[ "$#" -gt 0 ]]; do
         if [[ -z "${MEDIA_DB:-}" ]]; then
             echo -e "${RED}MEDIA_DB is not set. Source /etc/profile.d/media_db.sh or export MEDIA_DB first.${RESET}"
             exit 1
+        fi
+        echo -e "${CYAN}Target database:${RESET} $MEDIA_DB"
+        read -r -p "Confirm configuration changes for this database? [y/N]: " CONFIRM_CONFIG
+        if [[ ! "$CONFIRM_CONFIG" =~ ^[Yy]$ ]]; then
+            echo "Configuration cancelled."
+            exit 0
         fi
         source_env
         python3 "$SCRIPT_DIR/scripts/manage_db_config.py" "$@"

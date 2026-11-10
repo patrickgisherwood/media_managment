@@ -12,6 +12,10 @@ fi
 REPO_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd -P)"
 SCRIPT_DIR="$REPO_ROOT"
 
+##################################
+# --- source functions --- #
+source "$REPO_ROOT"/src/print_messages.sh
+
 APP_INSTALL_ROOT="${MEDIA_MANAGEMENT_ROOT:-/etc/media_management}"
 APP_CONFIG_PATH="${MEDIA_MANAGEMENT_CONFIG_PATH:-${APP_INSTALL_ROOT}/app.yaml}"
 APP_VENV_PATH="${MEDIA_MANAGEMENT_VENV_PATH:-${APP_INSTALL_ROOT}/.venv}"
@@ -28,9 +32,6 @@ if [[ ! -d "$REPO_ROOT/src" || ! -d "$REPO_ROOT/scripts" ]]; then
   exit 1
 fi
 
-##################################
-# --- source functions --- #
-source "$REPO_ROOT"/src/print_messages.sh
 
 echo_msg "Starting Media Management setup"
 

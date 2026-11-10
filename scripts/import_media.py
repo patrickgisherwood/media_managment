@@ -15,6 +15,7 @@ for candidate in [
 
 from tqdm import tqdm
 from datetime import datetime
+from PIL import UnidentifiedImageError
 from handlers.Image_Handler import ImgHandler
 from handlers.Video_Handler import VideoHandler
 from colorama import Fore, Style, init
@@ -70,8 +71,8 @@ def main():
     logger.info(f"Database root path: {root_path}")
     logger.info(f"Importing files from: {import_directory}")
 
-    img_extensions = (".heic", "HEIC", ".jpg", ".JPG", ".jpeg", ".PNG")
-    video_extensions = ('.MOV', '.mov', '.mp4', '.MP4')
+    img_extensions = (".heic", ".jpg", ".jpeg", ".png")
+    video_extensions = ('.mov', '.mp4')
 
     # Get statistics
     start_time = datetime.now()
@@ -114,14 +115,11 @@ def main():
     max_copy_attempts = 10
 
     
-    # confirm settings
-    for i in range(2):
-        user_accepted = input(f"\nContinue with the transfer? [yes/no]:  ")
-        if user_accepted == "yes": 
-            break
-        elif i == 3:
-            print("Invalid input. Exiting")
-            exit()
+    # Direct script use can bypass app.sh, so repeat the database confirmation here.
+    user_accepted = input(f"\nConfirm import into {root_path}? [yes/no]:  ").strip().lower()
+    if user_accepted not in ("yes", "y"):
+        print("Import cancelled.")
+        return
 
     number_images_processed = 0
     number_videos_processed = 0
@@ -135,25 +133,31 @@ def main():
     all_files = []
     for root, dirs, files in os.walk(import_directory):
         for file in files:
-            if file.endswith(img_extensions) or file.endswith(video_extensions):
+            lower_file = file.lower()
+            if lower_file.endswith(img_extensions) or lower_file.endswith(video_extensions):
                 all_files.append(os.path.join(root, file))
 
     # image processing
     for file in tqdm(all_files, desc="Importing Images", unit="file"):
-        if file.endswith(img_extensions):
+        lower_file = file.lower()
+        if lower_file.endswith(img_extensions):
             for attempt in range(1, max_copy_attempts+1):
                 try:
                     image_handler.process_img(file)
                     number_images_processed += 1
                     break     # success
 
+                except (UnidentifiedImageError, FileNotFoundError, PermissionError) as e:
+                    logger.exception(f"Image could not be opened or accessed: [{file}]")
+                    num_images_failed += 1
+                    break
                 except Exception as e:
                     if attempt == max_copy_attempts:
-                        logger.info(f"Failed processing Image: [{file}]")
+                        logger.exception(f"Failed processing Image after {max_copy_attempts} attempts: [{file}]")
                         num_images_failed += 1
                         break                            
 
-        elif file.endswith(video_extensions):                                   # video processing
+        elif lower_file.endswith(video_extensions):                                # video processing
             for attempt in range(1, max_copy_attempts):
                 try:
                     video = VideoHandler(file, root_path, logger, remove_files=delete_after_copy)

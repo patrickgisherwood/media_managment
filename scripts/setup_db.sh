@@ -135,6 +135,10 @@ yq -i ".image_handling.duplicate_detection.exclusion_directories = [\"$UNSORTED_
 mkdir -p "$DB_PATH/.tmp"
 sudo chown -R "$USER":"$USER" "$DB_PATH"
 
+python3 "$REPO_ROOT/scripts/database.py" register "$USER_DB_NAME" "$DB_PATH"
+
+# Keep profile setup from claiming that an old database is the active database.
+# New databases are explicitly selected with `media use <name>`.
 echo "export MEDIA_DB=$DB_PATH" | sudo tee /etc/profile.d/media_db.sh
 sudo chmod +x /etc/profile.d/media_db.sh
 

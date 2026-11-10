@@ -6,12 +6,11 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 SRC_DIR = ROOT_DIR / "src"
-UTILS_DIR = SRC_DIR / "utils"
-for candidate in [str(SRC_DIR), str(UTILS_DIR), str(ROOT_DIR)]:
+for candidate in [str(SRC_DIR), str(ROOT_DIR)]:
     if candidate not in sys.path:
         sys.path.insert(0, candidate)
 
-from confighandler import AppProperties
+from utils.confighandler import AppProperties
 
 
 def get_config_path():
@@ -41,8 +40,14 @@ def main():
     config_path = get_config_path()
     props = AppProperties(str(config_path))
 
+    db_root = config_path.parents[1]
+    print(f"Target database: {db_root.name} ({db_root})")
     print(f"Editing database config: {config_path}")
     print()
+    confirm = input("Confirm that this database is correct? [y/N]: ").strip().lower()
+    if confirm != "y":
+        print("Configuration cancelled.")
+        return
 
     delete_after_copy = prompt_bool(
         "Delete after copy? (WARNING: permanently deletes originals from the import directory).  Current Config Value: "+str(props.get("image_handling.delete_after_copy", False)),
